@@ -267,6 +267,54 @@ public class MstarEmu extends GhidraScript {
         }
     }
 
+    static private class EFUSE extends Device {
+
+        private static final long EFUSE_START = 0x4000;
+        private static final long EFUSE_END = EFUSE_START + 0x200;
+
+        EFUSE(GhidraScript script, long start, long end) {
+            super(script, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0;
+        }
+
+        static EFUSE efuse(GhidraScript script) {
+            return new EFUSE(script, EFUSE_START, EFUSE_END);
+        }
+    }
+
+    static private class MAILBOX extends Device {
+
+        private static final long MAILBOX_START = 0x200800;
+        private static final long MAILBOX_END = MAILBOX_START + 0x200;
+
+        MAILBOX(GhidraScript script, long start, long end) {
+            super(script, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+            script.printf("New check point 0x%08x\n", value);
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0;
+        }
+
+        static MAILBOX mailbox(GhidraScript script) {
+            return new MAILBOX(script, MAILBOX_START, MAILBOX_END);
+        }
+    }
+
     private class Bus {
         private final long start;
         private final long end;
@@ -455,26 +503,11 @@ public class MstarEmu extends GhidraScript {
         riu.registerDevice(UART.pmUart(this));
         riu.registerDevice(CPUPLL.cpupll(this));
         riu.registerDevice(CHIPTOP.chiptopSSD210(this));
+        riu.registerDevice(EFUSE.efuse(this));
+        riu.registerDevice(MAILBOX.mailbox(this));
 
         emulatorHelper.getEmulator().addMemoryAccessFilter(riu.getMemoryAccessFilter());
 
-        emulatorHelper.getEmulator().addMemoryAccessFilter(new MemoryAccessFilter() {
-            @Override
-            protected void processRead(AddressSpace spc, long off, int size, byte[] values) {
-                if (off >= RIU_START && off < RIU_END) {
-                    long riuoff = off - RIU_START;
-                }
-            }
-
-            @Override
-            protected void processWrite(AddressSpace spc, long off, int size, byte[] values) {
-                if (off >= RIU_START && off < RIU_END) {
-                    long riuoff = off - RIU_START;
-                    if (riuoff == 200800)
-                        printf("New check point 0x%08x\n", fourByteToLong(values));
-                }
-            }
-        });
 
         emulatorHelper.writeRegister("pc", 0xa0000000);
 
