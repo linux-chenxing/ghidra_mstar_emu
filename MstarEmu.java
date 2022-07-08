@@ -13,6 +13,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSpace;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 
@@ -315,17 +316,147 @@ public class MstarEmu extends GhidraScript {
         }
     }
 
+    static class MIUANA extends Device {
+        private static final long MIUANA_START = 0x202000;
+        private static final long MIUANA_END = MIUANA_START + 0x200;
+
+        private static final int REG_60 = 0x60;
+        private static final int REG_64 = 0x64;
+
+        private long reg60;
+        private long reg64;
+
+        MIUANA(GhidraScript script, long start, long end) {
+            super(script, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+            int reg = registerOffset(offset);
+            switch (reg) {
+                case REG_60:
+                    reg60 = value;
+                    break;
+                case REG_64:
+                    reg64 = value;
+                    break;
+            }
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            int reg = registerOffset(offset);
+            switch (reg) {
+                case REG_60:
+                    return reg60;
+                case REG_64:
+                    return reg64;
+                default:
+                    return 0;
+            }
+        }
+
+        static MIUANA miuana(GhidraScript script) {
+            return new MIUANA(script, MIUANA_START, MIUANA_END);
+        }
+    }
+
+    static class MIUDIG extends Device {
+
+        private static final long MIUDIG_START = 0x202200;
+        private static final long MIUDIG_END = MIUDIG_START + 0x400;
+
+        private static final int SOMESORTOFTRIGGER = 0x3c0;
+        private static final int SOMESORTOFTRIGGER_TRIG = (1 << 0);
+        private static final int SOMESORTOFTRIGGER_DONE = (1 << 15);
+
+        MIUDIG(GhidraScript script, long start, long end) {
+            super(script, start, end);
+        }
+
+        private long somesortoftrigger = 0;
+
+
+        @Override
+        public void writeRegister(long offset, long value) {
+            int reg = registerOffset(offset);
+            switch (reg) {
+                case SOMESORTOFTRIGGER:
+                    if ((value & SOMESORTOFTRIGGER_TRIG) != 0) {
+                        script.printf("triggered!\n");
+                        value |= SOMESORTOFTRIGGER_DONE;
+                    }
+                    somesortoftrigger = value;
+                    break;
+            }
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            int reg = registerOffset(offset);
+            switch (reg) {
+                case SOMESORTOFTRIGGER:
+                    return somesortoftrigger;
+                default:
+                    return 0;
+            }
+        }
+
+        static MIUDIG miudig(GhidraScript script) {
+            return new MIUDIG(script, MIUDIG_START, MIUDIG_END);
+        }
+    }
+
+    static class Memory extends Device {
+
+        private HashMap<Long, Long> data = new HashMap<>();
+
+        Memory(GhidraScript script, long start, long end) {
+            super(script, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+            script.printf("Memory write: 0x%08x -> 0x%08x\n", offset, value);
+            data.put(offset, value);
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            long value = 0;
+            if (data.containsKey(offset))
+                value = data.get(offset);
+            script.printf("Memory read: 0x%08x = 0x%08x\n", offset, value);
+            return value;
+        }
+
+        static Memory sixtyFourMeg(GhidraScript script) {
+            long size = 64 * (1024 * 1024);
+            return new Memory(script, 0, size);
+        }
+    }
+
     private class Bus {
-        private final long start;
-        private final long end;
+        private final String name;
+        protected final long start;
+        protected final long end;
 
         private final MemoryAccessFilter memoryAccessFilter;
 
-        private final List<Device> devices = new ArrayList<>();
+        protected final List<Device> devices = new ArrayList<>();
 
-        boolean noisy = false;
+        private boolean noisy = false;
 
-        Bus(long start, long end) {
+        public void enableNoise() {
+            noisy = true;
+        }
+
+        protected long accessOffsetFixUp(long offset) {
+            return offset;
+        }
+
+        Bus(String name, long start, long end) {
+            this.name = name;
             this.start = start;
             this.end = end;
 
@@ -350,6 +481,8 @@ public class MstarEmu extends GhidraScript {
                     if (!(off >= start && off < end))
                         return;
 
+                    off = accessOffsetFixUp(off);
+
                     checkSize(size);
 
                     long riuOffset = off - start;
@@ -372,19 +505,23 @@ public class MstarEmu extends GhidraScript {
                                     break;
                             }
                             if (noisy)
-                                printf("RIU Register read:\t0x%08x = 0x%08x\n", riuOffset, value);
+                                printf("%s Register read:\t0x%08x = 0x%08x, size %d\n",
+                                        name, riuOffset, value, size);
                             handled = true;
                             break;
                         }
                     }
                     if (!handled)
-                        printf("RIU Register unhandled read:\t0x%08x\n", riuOffset);
+                        printf("%s Register unhandled read:\t0x%08x, size %d\n",
+                                name, riuOffset, size);
                 }
 
                 @Override
                 protected void processWrite(AddressSpace spc, long off, int size, byte[] values) {
                     if (!(off >= start && off < end))
                         return;
+
+                    off = accessOffsetFixUp(off);
 
                     checkSize(size);
 
@@ -412,16 +549,18 @@ public class MstarEmu extends GhidraScript {
                                     break;
                             }
                             if (noisy)
-                                printf("RIU Register write:\t0x%08x: 0x%08x -> 0x%08x, write size %d\n",
-                                        riuOffset, currentValue, newValue, size);
+                                printf("%s Register write:\t0x%08x: 0x%08x -> 0x%08x, write size %d\n",
+                                        name, riuOffset, currentValue, newValue, size);
                             d.writeRegister(riuOffset, newValue);
 
                             handled = true;
                             break;
                         }
-                    if (!handled)
-                        printf("RIU Register unhandled write:\t0x%08x, write size %d\n",
-                                riuOffset, size);
+                    if (!handled) {
+                        long value = bytesToLong(values, size);
+                        printf("%s Register unhandled write:\t0x%08x -> 0x%08x, write size %d\n",
+                                name, riuOffset, value, size);
+                    }
                 }
             };
         }
@@ -441,19 +580,48 @@ public class MstarEmu extends GhidraScript {
 
     }
 
-    private static long RIU_START = 0x1f000000;
-    private static long RIU_END = 0x20000000;
+    /* A bus that wraps for a single device */
+    class MemoryBus extends Bus {
 
+        MemoryBus(String name, long start, long end) {
+            super(name, start, end);
+        }
+
+        @Override
+        protected long accessOffsetFixUp(long offset) {
+            if (devices.size() != 1)
+                return offset;
+
+            Device d = devices.get(0);
+
+            long mask = d.end - 1;
+
+            //printf("o: %x, %x, %x, %x\n", offset, d.end, mask, (offset & mask));
+
+            return (offset & mask) + start;
+        }
+
+        @Override
+        public void registerDevice(Device device) {
+            if (devices.size() != 0)
+                throw new IllegalStateException("Only on device can be on memory bus\n");
+
+            if (device.start != 0)
+                throw new IllegalArgumentException("Device must start at 0\n");
+
+            super.registerDevice(device);
+        }
+    }
 
     static long bytesToLong(byte[] bytes, int nbytes) {
         long value = 0;
         for (int i = 0; i < nbytes; i++)
-            value |= bytes[i] << (8 * i);
+            value |= ((long) bytes[i] & 0xffL) << (8 * i);
         return value;
     }
 
     static long fourByteToLong(byte[] bytes) {
-        return bytesToLong(bytes, 4);
+        return bytesToLong(bytes, 3);
     }
 
     static long twoBytesToLong(byte[] bytes) {
@@ -497,7 +665,10 @@ public class MstarEmu extends GhidraScript {
         };
         emulatorHelper.registerDefaultCallOtherCallback(dummyCallOtherCallback);
 
-        Bus riu = new Bus(RIU_START, RIU_END);
+        final long RIU_START = 0x1f000000;
+        final long RIU_END = 0x20000000;
+        Bus riu = new Bus("RIU", RIU_START, RIU_END);
+        riu.enableNoise();
         riu.registerDevice(WDT.wdt(this));
         riu.registerDevice(Timer.timer0(this));
         riu.registerDevice(UART.pmUart(this));
@@ -505,8 +676,16 @@ public class MstarEmu extends GhidraScript {
         riu.registerDevice(CHIPTOP.chiptopSSD210(this));
         riu.registerDevice(EFUSE.efuse(this));
         riu.registerDevice(MAILBOX.mailbox(this));
+        riu.registerDevice(MIUANA.miuana(this));
+        riu.registerDevice(MIUDIG.miudig(this));
+
+        final long MIU_START = 0x20000000;
+        final long MIU_END = MIU_START + 0x20000000;
+        Bus miu = new MemoryBus("MIU", MIU_START, MIU_END);
+        miu.registerDevice(Memory.sixtyFourMeg(this));
 
         emulatorHelper.getEmulator().addMemoryAccessFilter(riu.getMemoryAccessFilter());
+        emulatorHelper.getEmulator().addMemoryAccessFilter(miu.getMemoryAccessFilter());
 
 
         emulatorHelper.writeRegister("pc", 0xa0000000);
@@ -516,10 +695,8 @@ public class MstarEmu extends GhidraScript {
 
             if (noisy) {
                 Address a = emulatorHelper.getExecutionAddress();
-                long regR0 = emulatorHelper.readRegister(currentProgram.getProgramContext()
-                        .getRegister("R0")).longValue();
-                long regR1 = emulatorHelper.readRegister(currentProgram.getProgramContext()
-                        .getRegister("R1")).longValue();
+                long regR0 = emulatorHelper.readRegister("R0").longValue();
+                long regR1 = emulatorHelper.readRegister("R1").longValue();
 
                 printf("PC: %s, R0: 0x%08x, R1: 0x%08x\n",
                         a.toString(), regR0, regR1);
