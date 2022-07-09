@@ -21,13 +21,16 @@ public class MstarEmu extends GhidraScript {
 
     static private abstract class Device {
         boolean noisy = false;
+
+        protected final String name;
         private final long start;
         private final long end;
 
         protected final GhidraScript script;
 
-        Device(GhidraScript script, long start, long end) {
+        Device(GhidraScript script, String name, long start, long end) {
             this.script = script;
+            this.name = name;
             this.start = start;
             this.end = end;
         }
@@ -64,8 +67,8 @@ public class MstarEmu extends GhidraScript {
 
         private long max = 0xffffffffL;
 
-        private Timer(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        private Timer(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -101,7 +104,7 @@ public class MstarEmu extends GhidraScript {
         }
 
         static Timer timer0(GhidraScript script) {
-            return new Timer(script, Timer.TIMER0_START, TIMER0_END);
+            return new Timer(script, "timer0", Timer.TIMER0_START, TIMER0_END);
         }
     }
 
@@ -109,8 +112,8 @@ public class MstarEmu extends GhidraScript {
         private static long WDT_START = 0x6000;
         private static long WDT_END = 0x6020;
 
-        private WDT(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        private WDT(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -131,7 +134,7 @@ public class MstarEmu extends GhidraScript {
 
 
         static WDT wdt(GhidraScript script) {
-            return new WDT(script, WDT.WDT_START, WDT.WDT_END);
+            return new WDT(script, "wdt", WDT.WDT_START, WDT.WDT_END);
         }
     }
 
@@ -154,8 +157,8 @@ public class MstarEmu extends GhidraScript {
 
         StringBuffer txBuffer = new StringBuffer();
 
-        UART(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        UART(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -205,7 +208,79 @@ public class MstarEmu extends GhidraScript {
         }
 
         static UART pmUart(GhidraScript script) {
-            return new UART(script, PMUART_START, PMUART_END);
+            return new UART(script, "pmuart", PMUART_START, PMUART_END);
+        }
+    }
+
+    static private class MPLL extends Device {
+
+        static final long MPLL_START = 0x206000L;
+        static final long MPLL_END = MPLL_START + 0x200L;
+
+        MPLL(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0;
+        }
+
+        static MPLL mpll(GhidraScript script) {
+            return new MPLL(script, "mpll", MPLL_START, MPLL_END);
+        }
+    }
+
+    static private class MIUPLL extends Device {
+
+        static final long MIUPLL_START = 0x206200L;
+        static final long MIUPLL_END = MIUPLL_START + 0x200L;
+
+        MIUPLL(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0;
+        }
+
+        static MIUPLL miupll(GhidraScript script) {
+            return new MIUPLL(script, "miupll", MIUPLL_START, MIUPLL_END);
+        }
+    }
+
+    static private class UPLL extends Device {
+
+        static final long UPLL0_START = 0x284000L;
+        static final long UPLL0_END = UPLL0_START + 0x200L;
+
+        UPLL(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0;
+        }
+
+        static UPLL upll0(GhidraScript script) {
+            return new UPLL(script, "upll0", UPLL0_START, UPLL0_END);
         }
     }
 
@@ -214,8 +289,8 @@ public class MstarEmu extends GhidraScript {
         private static final long CPUPLL_START = 0x206400;
         private static final long CPUPLL_END = CPUPLL_START + 0x200;
 
-        CPUPLL(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        CPUPLL(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -229,7 +304,31 @@ public class MstarEmu extends GhidraScript {
         }
 
         static CPUPLL cpupll(GhidraScript script) {
-            return new CPUPLL(script, CPUPLL_START, CPUPLL_END);
+            return new CPUPLL(script, "cpupll", CPUPLL_START, CPUPLL_END);
+        }
+    }
+
+    static private class CLKGEN extends Device {
+
+        private static final long CLKGEN_START = 0x207000;
+        private static final long CLKGEN_END = CLKGEN_START + 0x200;
+
+        CLKGEN(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0x0;
+        }
+
+        static CLKGEN clkgen(GhidraScript script) {
+            return new CLKGEN(script, "clkgen", CLKGEN_START, CLKGEN_END);
         }
     }
 
@@ -242,8 +341,8 @@ public class MstarEmu extends GhidraScript {
 
         final long bondValue;
 
-        CHIPTOP(GhidraScript script, long start, long end, long bondValue) {
-            super(script, start, end);
+        CHIPTOP(GhidraScript script, String name, long start, long end, long bondValue) {
+            super(script, name, start, end);
             this.bondValue = bondValue;
         }
 
@@ -264,7 +363,7 @@ public class MstarEmu extends GhidraScript {
         }
 
         static CHIPTOP chiptopSSD210(GhidraScript ghidraScript) {
-            return new CHIPTOP(ghidraScript, CHIPTOP_START, CHIPTOP_END, 0x06);
+            return new CHIPTOP(ghidraScript, "chiptop_ssd210", CHIPTOP_START, CHIPTOP_END, 0x06);
         }
     }
 
@@ -273,8 +372,8 @@ public class MstarEmu extends GhidraScript {
         private static final long EFUSE_START = 0x4000;
         private static final long EFUSE_END = EFUSE_START + 0x200;
 
-        EFUSE(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        EFUSE(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -288,7 +387,7 @@ public class MstarEmu extends GhidraScript {
         }
 
         static EFUSE efuse(GhidraScript script) {
-            return new EFUSE(script, EFUSE_START, EFUSE_END);
+            return new EFUSE(script, "efuse", EFUSE_START, EFUSE_END);
         }
     }
 
@@ -297,8 +396,8 @@ public class MstarEmu extends GhidraScript {
         private static final long MAILBOX_START = 0x200800;
         private static final long MAILBOX_END = MAILBOX_START + 0x200;
 
-        MAILBOX(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        MAILBOX(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -312,7 +411,7 @@ public class MstarEmu extends GhidraScript {
         }
 
         static MAILBOX mailbox(GhidraScript script) {
-            return new MAILBOX(script, MAILBOX_START, MAILBOX_END);
+            return new MAILBOX(script, "mailbox", MAILBOX_START, MAILBOX_END);
         }
     }
 
@@ -326,8 +425,8 @@ public class MstarEmu extends GhidraScript {
         private long reg60;
         private long reg64;
 
-        MIUANA(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        MIUANA(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -357,7 +456,7 @@ public class MstarEmu extends GhidraScript {
         }
 
         static MIUANA miuana(GhidraScript script) {
-            return new MIUANA(script, MIUANA_START, MIUANA_END);
+            return new MIUANA(script, "miuana", MIUANA_START, MIUANA_END);
         }
     }
 
@@ -370,8 +469,8 @@ public class MstarEmu extends GhidraScript {
         private static final int SOMESORTOFTRIGGER_TRIG = (1 << 0);
         private static final int SOMESORTOFTRIGGER_DONE = (1 << 15);
 
-        MIUDIG(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        MIUDIG(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         private long somesortoftrigger = 0;
@@ -403,7 +502,7 @@ public class MstarEmu extends GhidraScript {
         }
 
         static MIUDIG miudig(GhidraScript script) {
-            return new MIUDIG(script, MIUDIG_START, MIUDIG_END);
+            return new MIUDIG(script, "miudig", MIUDIG_START, MIUDIG_END);
         }
     }
 
@@ -411,8 +510,8 @@ public class MstarEmu extends GhidraScript {
 
         private HashMap<Long, Long> data = new HashMap<>();
 
-        Memory(GhidraScript script, long start, long end) {
-            super(script, start, end);
+        Memory(GhidraScript script, String name, long start, long end) {
+            super(script, name, start, end);
         }
 
         @Override
@@ -432,7 +531,7 @@ public class MstarEmu extends GhidraScript {
 
         static Memory sixtyFourMeg(GhidraScript script) {
             long size = 64 * (1024 * 1024);
-            return new Memory(script, 0, size);
+            return new Memory(script, "DDR2", 0, size);
         }
     }
 
@@ -505,8 +604,8 @@ public class MstarEmu extends GhidraScript {
                                     break;
                             }
                             if (noisy)
-                                printf("%s Register read:\t0x%08x = 0x%08x, size %d\n",
-                                        name, riuOffset, value, size);
+                                printf("%s Register read - %s:\t0x%08x = 0x%08x, size %d\n",
+                                        name, d.name, riuOffset, value, size);
                             handled = true;
                             break;
                         }
@@ -549,8 +648,8 @@ public class MstarEmu extends GhidraScript {
                                     break;
                             }
                             if (noisy)
-                                printf("%s Register write:\t0x%08x: 0x%08x -> 0x%08x, write size %d\n",
-                                        name, riuOffset, currentValue, newValue, size);
+                                printf("%s Register write - %s:\t0x%08x: 0x%08x -> 0x%08x, write size %d\n",
+                                        name, d.name, riuOffset, currentValue, newValue, size);
                             d.writeRegister(riuOffset, newValue);
 
                             handled = true;
@@ -621,7 +720,7 @@ public class MstarEmu extends GhidraScript {
     }
 
     static long fourByteToLong(byte[] bytes) {
-        return bytesToLong(bytes, 3);
+        return bytesToLong(bytes, 4);
     }
 
     static long twoBytesToLong(byte[] bytes) {
@@ -672,6 +771,10 @@ public class MstarEmu extends GhidraScript {
         riu.registerDevice(WDT.wdt(this));
         riu.registerDevice(Timer.timer0(this));
         riu.registerDevice(UART.pmUart(this));
+        riu.registerDevice(CLKGEN.clkgen(this));
+        riu.registerDevice(MPLL.mpll(this));
+        riu.registerDevice(MIUPLL.miupll(this));
+        riu.registerDevice(UPLL.upll0(this));
         riu.registerDevice(CPUPLL.cpupll(this));
         riu.registerDevice(CHIPTOP.chiptopSSD210(this));
         riu.registerDevice(EFUSE.efuse(this));
