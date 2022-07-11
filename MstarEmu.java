@@ -362,8 +362,19 @@ public class MstarEmu extends GhidraScript {
             }
         }
 
+        static CHIPTOP chiptopSSD201(GhidraScript ghidraScript) {
+            return new CHIPTOP(ghidraScript, "chiptop_ssd201",
+                    CHIPTOP_START, CHIPTOP_END, 0x1d);
+        }
+
+        static CHIPTOP chiptopSSD202D(GhidraScript ghidraScript) {
+            return new CHIPTOP(ghidraScript, "chiptop_ssd202D",
+                    CHIPTOP_START, CHIPTOP_END, 0x1e);
+        }
+
         static CHIPTOP chiptopSSD210(GhidraScript ghidraScript) {
-            return new CHIPTOP(ghidraScript, "chiptop_ssd210", CHIPTOP_START, CHIPTOP_END, 0x06);
+            return new CHIPTOP(ghidraScript, "chiptop_ssd210",
+                    CHIPTOP_START, CHIPTOP_END, 0x06);
         }
     }
 
@@ -748,8 +759,19 @@ public class MstarEmu extends GhidraScript {
         longToBytes(val, bytes, 1);
     }
 
+    enum ChipType {
+        SSD201,
+        SSD202D,
+        SSD210,
+    }
+
     @Override
     protected void run() throws Exception {
+
+        ChipType chipType =
+                askChoice("Chip Type", "Pick the target chip",
+                        List.of(ChipType.values()), ChipType.SSD210);
+
         EmulatorHelper emulatorHelper = new EmulatorHelper(getCurrentProgram());
 
         final BreakCallBack dummyCallOtherCallback = new BreakCallBack() {
@@ -776,7 +798,18 @@ public class MstarEmu extends GhidraScript {
         riu.registerDevice(MIUPLL.miupll(this));
         riu.registerDevice(UPLL.upll0(this));
         riu.registerDevice(CPUPLL.cpupll(this));
-        riu.registerDevice(CHIPTOP.chiptopSSD210(this));
+
+        switch (chipType) {
+            case SSD201:
+                riu.registerDevice(CHIPTOP.chiptopSSD201(this));
+                break;
+            case SSD202D:
+                riu.registerDevice(CHIPTOP.chiptopSSD202D(this));
+                break;
+            case SSD210:
+                riu.registerDevice(CHIPTOP.chiptopSSD210(this));
+                break;
+        }
         riu.registerDevice(EFUSE.efuse(this));
         riu.registerDevice(MAILBOX.mailbox(this));
         riu.registerDevice(MIUANA.miuana(this));
