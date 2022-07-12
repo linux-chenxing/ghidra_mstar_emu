@@ -50,6 +50,10 @@ public class MstarEmu extends GhidraScript {
         public void doTick() {
 
         }
+
+        public boolean isMundane() {
+            return false;
+        }
     }
 
     static private class Timer extends Device {
@@ -105,6 +109,11 @@ public class MstarEmu extends GhidraScript {
 
         static Timer timer0(GhidraScript script) {
             return new Timer(script, "timer0", Timer.TIMER0_START, TIMER0_END);
+        }
+
+        @Override
+        public boolean isMundane() {
+            return true;
         }
     }
 
@@ -209,6 +218,11 @@ public class MstarEmu extends GhidraScript {
 
         static UART pmUart(GhidraScript script) {
             return new UART(script, "pmuart", PMUART_START, PMUART_END);
+        }
+
+        @Override
+        public boolean isMundane() {
+            return true;
         }
     }
 
@@ -329,6 +343,55 @@ public class MstarEmu extends GhidraScript {
 
         static CLKGEN clkgen(GhidraScript script) {
             return new CLKGEN(script, "clkgen", CLKGEN_START, CLKGEN_END);
+        }
+    }
+
+    static private class PADTOP extends Device {
+
+        private static long PADTOP_START = 0x207800L;
+        private static long PADTOP_END = PADTOP_START + 0x200L;
+
+        private PADTOP(GhidraScript script, String name) {
+            super(script, name, PADTOP_START, PADTOP_END);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            // only for msc8336..
+            int reg = registerOffset(offset);
+            switch (reg) {
+                case 0x18:
+                    return 0x01L;
+            }
+
+            return 0;
+        }
+
+        static public PADTOP msc8336(GhidraScript script) {
+            return new PADTOP(script, "msc8336-padtop");
+        }
+    }
+
+    static private class MSC8336MYSTERY extends Device {
+
+
+        MSC8336MYSTERY(GhidraScript script) {
+            super(script, "msc8336mystery", 0x3c00L, 0x3c00L + 0x200L);
+        }
+
+        @Override
+        public void writeRegister(long offset, long value) {
+
+        }
+
+        @Override
+        public long readRegister(long offset, boolean internal) {
+            return 0xd9;
         }
     }
 
@@ -623,7 +686,7 @@ public class MstarEmu extends GhidraScript {
                                     longToByte(value, values);
                                     break;
                             }
-                            if (noisy)
+                            if (noisy && !d.isMundane())
                                 printf("%s Register read - %s:\t0x%08x = 0x%08x, size %d\n",
                                         name, d.name, riuOffset, value, size);
                             handled = true;
@@ -667,7 +730,7 @@ public class MstarEmu extends GhidraScript {
                                     newValue |= (byteToLong(values) << valueShift);
                                     break;
                             }
-                            if (noisy)
+                            if (noisy && !d.isMundane())
                                 printf("%s Register write - %s:\t0x%08x: 0x%08x -> 0x%08x, write size %d\n",
                                         name, d.name, riuOffset, currentValue, newValue, size);
                             d.writeRegister(riuOffset, newValue);
@@ -769,6 +832,7 @@ public class MstarEmu extends GhidraScript {
     }
 
     enum ChipType {
+        MSC8336,
         MSC313E,
         SSD201,
         SSD202D,
@@ -810,6 +874,7 @@ public class MstarEmu extends GhidraScript {
         riu.registerDevice(CPUPLL.cpupll(this));
 
         switch (chipType) {
+            case MSC8336:
             case MSC313E:
                 riu.registerDevice(CHIPTOP.chiptopMSC313E(this));
                 break;
@@ -822,6 +887,12 @@ public class MstarEmu extends GhidraScript {
             case SSD210:
                 riu.registerDevice(CHIPTOP.chiptopSSD210(this));
                 break;
+        }
+
+        switch (chipType) {
+            case MSC8336:
+                riu.registerDevice(new MSC8336MYSTERY(this));
+                riu.registerDevice(PADTOP.msc8336(this));
         }
         riu.registerDevice(EFUSE.efuse(this));
         riu.registerDevice(MAILBOX.mailbox(this));
