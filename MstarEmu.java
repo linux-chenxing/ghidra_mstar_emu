@@ -356,10 +356,19 @@ public class MstarEmu extends GhidraScript {
             int reg = registerOffset(offset);
             switch (reg) {
                 case CHIPTOP.CHIPTOP_BOND_IN:
-                    return bondValue;
+                    if (bondValue == -1) {
+                        script.printf("Reading bond value on chip that doesn't have one\n");
+                        return 0;
+                    } else
+                        return bondValue;
                 default:
                     return 0;
             }
+        }
+
+        static CHIPTOP chiptopMSC313E(GhidraScript ghidraScript) {
+            return new CHIPTOP(ghidraScript, "chiptop_msc313e",
+                    CHIPTOP_START, CHIPTOP_END, -1);
         }
 
         static CHIPTOP chiptopSSD201(GhidraScript ghidraScript) {
@@ -760,6 +769,7 @@ public class MstarEmu extends GhidraScript {
     }
 
     enum ChipType {
+        MSC313E,
         SSD201,
         SSD202D,
         SSD210,
@@ -800,6 +810,9 @@ public class MstarEmu extends GhidraScript {
         riu.registerDevice(CPUPLL.cpupll(this));
 
         switch (chipType) {
+            case MSC313E:
+                riu.registerDevice(CHIPTOP.chiptopMSC313E(this));
+                break;
             case SSD201:
                 riu.registerDevice(CHIPTOP.chiptopSSD201(this));
                 break;
