@@ -429,6 +429,11 @@ public class MstarEmu extends GhidraScript {
             }
         }
 
+        static CHIPTOP chiptopMSC8336(GhidraScript ghidraScript) {
+            return new CHIPTOP(ghidraScript, "chiptop_msc8336",
+                    CHIPTOP_START, CHIPTOP_END, -1);
+        }
+
         static CHIPTOP chiptopMSC313E(GhidraScript ghidraScript) {
             return new CHIPTOP(ghidraScript, "chiptop_msc313e",
                     CHIPTOP_START, CHIPTOP_END, -1);
@@ -495,6 +500,11 @@ public class MstarEmu extends GhidraScript {
 
         static MAILBOX mailbox(GhidraScript script) {
             return new MAILBOX(script, "mailbox", MAILBOX_START, MAILBOX_END);
+        }
+
+        @Override
+        public boolean isMundane() {
+            return true;
         }
     }
 
@@ -593,6 +603,8 @@ public class MstarEmu extends GhidraScript {
 
         private HashMap<Long, Long> data = new HashMap<>();
 
+        private boolean written = false;
+
         Memory(GhidraScript script, String name, long start, long end) {
             super(script, name, start, end);
         }
@@ -601,6 +613,7 @@ public class MstarEmu extends GhidraScript {
         public void writeRegister(long offset, long value) {
             script.printf("Memory write: 0x%08x -> 0x%08x\n", offset, value);
             data.put(offset, value);
+            written = true;
         }
 
         @Override
@@ -610,6 +623,10 @@ public class MstarEmu extends GhidraScript {
                 value = data.get(offset);
             script.printf("Memory read: 0x%08x = 0x%08x\n", offset, value);
             return value;
+        }
+
+        public boolean hasBeenWritten() {
+            return written;
         }
 
         static Memory sixtyFourMeg(GhidraScript script) {
@@ -875,6 +892,8 @@ public class MstarEmu extends GhidraScript {
 
         switch (chipType) {
             case MSC8336:
+                riu.registerDevice(CHIPTOP.chiptopMSC8336(this));
+                break;
             case MSC313E:
                 riu.registerDevice(CHIPTOP.chiptopMSC313E(this));
                 break;
@@ -902,7 +921,8 @@ public class MstarEmu extends GhidraScript {
         final long MIU_START = 0x20000000;
         final long MIU_END = MIU_START + 0x20000000;
         Bus miu = new MemoryBus("MIU", MIU_START, MIU_END);
-        miu.registerDevice(Memory.sixtyFourMeg(this));
+        Memory ddr = Memory.sixtyFourMeg(this);
+        miu.registerDevice(ddr);
 
         emulatorHelper.getEmulator().addMemoryAccessFilter(riu.getMemoryAccessFilter());
         emulatorHelper.getEmulator().addMemoryAccessFilter(miu.getMemoryAccessFilter());
@@ -928,6 +948,9 @@ public class MstarEmu extends GhidraScript {
             }
             Thread.sleep(1);
             riu.doTick();
+
+            if (ddr.hasBeenWritten())
+                break;
         }
 
         emulatorHelper.dispose();
